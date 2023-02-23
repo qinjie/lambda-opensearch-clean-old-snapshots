@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/lambda-opensearch-snapshot.iml" filepath="$PROJECT_DIR$/.idea/lambda-opensearch-snapshot.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/lambda-opensearch-clean-old-snapshots.iml" filepath="$PROJECT_DIR$/.idea/lambda-opensearch-clean-old-snapshots.iml" />
     </modules>
   </component>
 </project>
