@@ -5,7 +5,8 @@ from requests_aws4auth import AWS4Auth
 from datetime import datetime
 
 EXCLUDED_INDICES = ('.opendistro_security', '.aws_cold_catalog_1')
-
+MASTER_TIMEOUT = '300s' # Period to wait for a connection to the master node. Defaults to 30s.
+TIMEOUT = '30s' # Period to wait for a response. Defaults to 30s.
 
 def get_snapshot_status(host: str, awsauth: AWS4Auth, repo_name: str = None, snapshot_name: str = None):
     """
@@ -33,7 +34,7 @@ def list_snapshots_in_repo(host: str, repo_name: str, awsauth: AWS4Auth) -> List
     r = requests.get(url, auth=awsauth)
     snapshots = r.json().get("snapshots", [])
     print(f'Snapshot count = {len(snapshots)}')
-    print(r.text)
+    # print(r.text)
 
     # Sort snapshots by start_time
     sortedlist = sorted(snapshots, key=lambda d: d['start_time'])
@@ -105,7 +106,7 @@ def delete_one_snapshot(host: str, awsauth: AWS4Auth, repo_name: str, snapshot_n
     """
     Deletes a snapshot.
     """
-    path = f'/_snapshot/{repo_name}/{snapshot_name}'
+    path = f'/_snapshot/{repo_name}/{snapshot_name}?master_timeout={MASTER_TIMEOUT}'
     url = host + path
 
     r = requests.delete(url, auth=awsauth)
@@ -140,11 +141,7 @@ def restore_latest_snapshot(host: str, awsauth: AWS4Auth, repo_name: str) -> boo
     latest_snapshot = get_latest_snapshot(host, repo_name, awsauth)
     if not latest_snapshot:
         return False
-
     snapshot_name = latest_snapshot.get('snapshot')
-
-    # Close indices appeared in snapshot
-    close_indices_in_snapshot(host, awsauth, repo_name, snapshot_name)
 
     # Start restoring
     restore_snapshot(host, awsauth, repo_name, snapshot_name)
@@ -276,6 +273,17 @@ def open_index(host: str, awsauth: AWS4Auth, index_name: str):
     headers = {"Content-Type": "application/json"}
     r = requests.post(url, auth=awsauth, json={}, headers=headers)
     print(f"Opening an index {index_name}: {r.text}")
+
+
+def clean_repo(host: str, awsauth: AWS4Auth, repo_name: str):
+    """
+    Triggers the review of a snapshot repository’s contents and deletes any stale data that is not referenced by existing snapshots.
+    """
+    path = f'/_snapshot/{repo_name}/_cleanup?master_timeout={MASTER_TIMEOUT}&timeout={TIMEOUT}'
+    url = host + path
+    headers = {"Content-Type": "application/json"}
+    r = requests.post(url, auth=awsauth, json={}, headers=headers)
+    print(f"Clean up snapshot repo {repo_name}: {r.text}")
 
 
 def get_latest_snapshot(host: str, repo_name: str, awsauth: AWS4Auth) -> Dict:
