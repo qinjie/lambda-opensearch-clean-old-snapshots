@@ -5,23 +5,27 @@ from requests_aws4auth import AWS4Auth
 from datetime import datetime
 
 EXCLUDED_INDICES = ('.opendistro_security', '.aws_cold_catalog_1')
-MASTER_TIMEOUT = '300s' # Period to wait for a connection to the master node. Defaults to 30s.
-TIMEOUT = '30s' # Period to wait for a response. Defaults to 30s.
+MASTER_TIMEOUT = '300s'  # Period to wait for a connection to the master node. Defaults to 30s.
+TIMEOUT = '30s'  # Period to wait for a response. Defaults to 30s.
+
 
 def get_snapshot_status(host: str, awsauth: AWS4Auth, repo_name: str = None, snapshot_name: str = None):
     """
     Retrieves a detailed description of the current state for each shard participating in the snapshot.
     """
     if repo_name and snapshot_name:
-        path = f'/_snapshot/{repo_name}/{snapshot_name}/_status'
+        path = f'/_snapshot/{repo_name}/{snapshot_name}/_status?ignore_unavailable=true'
     elif repo_name:
-        path = f'/_snapshot/{repo_name}/_status'
+        path = f'/_snapshot/{repo_name}/_status?ignore_unavailable=true'
     else:
         path = f'/_snapshot/_status'
 
     url = host + path
     r = requests.get(url, auth=awsauth)
-    print(f"Taking/restoring snapshot in progress: {r.text}")
+    if snapshot_name:
+        print(f'Snapshot {snapshot_name} status: {r.text}')
+    else:
+        print(f"Snapshot in progress: {r.text}")
 
 
 def list_snapshots_in_repo(host: str, repo_name: str, awsauth: AWS4Auth) -> List:

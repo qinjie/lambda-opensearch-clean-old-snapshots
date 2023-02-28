@@ -1,7 +1,9 @@
+import time
+
 import boto3
 from requests_aws4auth import AWS4Auth
 
-from opensearch_utils import list_snapshots_in_repo, delete_one_snapshot, clean_repo
+from opensearch_utils import list_snapshots_in_repo, delete_one_snapshot, clean_repo, get_snapshot_status
 
 # # Settings
 # host_sources = [('<DOMAIN_ENDPOINT_WITH_HTTPS>','<REPOSITORY_NAME>','<S3_BUCKET_NAME>')]  # 源头域终端节点
@@ -43,9 +45,19 @@ def lambda_handler(event, context):
             for batch in batches_to_delete:
                 print('Deleting', batch)
                 try:
-                    delete_one_snapshot(host, awsauth, repo, ','.join(batch))
+                    batch_names = ','.join(batch)
+                    # Wait till no snapshot operations in progress
+                    while status := get_snapshot_status(host, awsauth, repo, batch_names):
+                        print('Snapshot in progress:', status)
+                        # Wait for 300ms before next check
+                        time.sleep(300 / 1000)
+                    # Deleting snapshots
+                    delete_one_snapshot(host, awsauth, repo, batch_names)
                 except Exception as ex:
+                    print('Exception:', ex)
                     pass
+
+            # Clean up files
             clean_repo(host, awsauth, repo)
 
     return {
