@@ -1,5 +1,4 @@
 from typing import Dict, List, Union, Tuple
-
 import requests
 from requests_aws4auth import AWS4Auth
 from datetime import datetime
@@ -104,7 +103,6 @@ def take_snapshot(host: str, awsauth: AWS4Auth, repo_name: str, snapshot_name: s
     print(r.text)
 
     return snapshot_name
-
 
 def delete_one_snapshot(host: str, awsauth: AWS4Auth, repo_name: str, snapshot_name: str):
     """
