@@ -4,8 +4,9 @@ import boto3
 import logging
 from requests_aws4auth import AWS4Auth
 from opensearch_utils import list_snapshots_in_repo, delete_one_snapshot, clean_repo, get_snapshot_status
+from threading import Thread
 
-boto3.set_stream_logger('botocore', logging.DEBUG)
+# boto3.set_stream_logger('botocore', logging.DEBUG)
 
 # # Settings
 # host_sources = [('<DOMAIN_ENDPOINT_WITH_HTTPS>','<REPOSITORY_NAME>','<S3_BUCKET_NAME>')]  # 源头域终端节点
@@ -28,9 +29,9 @@ awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, session.regio
                    session_token=credentials.token)
 
 # How many snapshots to keep
-MIN_SNAPSHOT_COUNT = 170
-BATCH_SIZE = 24
-
+MIN_SNAPSHOT_COUNT = 1
+BATCH_SIZE = 2
+THREAD_TIMEOUT = 5 # seconds
 
 def lambda_handler(event, context):
 
@@ -49,19 +50,29 @@ def lambda_handler(event, context):
             snapshots_old_map[f'{host},{repo}'] = snapshots_old
 
     # Delete one batch from each repo
+    thread_map = {}
     for host_repo, snapshots_old in snapshots_old_map.items():
         host, repo = host_repo.split(',')
         batch = snapshots_old[:BATCH_SIZE]
         try:
             batch_names = ','.join(batch)
             print(f'Delete snapshots in {host}:', batch_names)
-            delete_one_snapshot(host, awsauth, repo, batch_names)
+
+            # delete_one_snapshot(host, awsauth, repo, batch_names)
+            thread = Thread(target=delete_one_snapshot, args=(host, awsauth, repo, batch_names))
+            thread.start()
+            thread_map[f'{host},{repo}'] = thread
         except Exception as ex:
             print('Exception:', ex)
 
     # Clean up files
-    for host, repo, _ in host_sources:
-        clean_repo(host, awsauth, repo)
+    for host_repo, thread in thread_map.items():
+        thread.join(timeout=THREAD_TIMEOUT)
+        if not thread.is_alive():
+            host, repo = host_repo.split(',')
+            clean_repo(host, awsauth, repo)
+        else:
+            print(f'Snapshot deleting still in progress: {host_repo}')
 
     return {
         'statusCode': 200
